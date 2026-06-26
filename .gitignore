@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+temp_input.wav
+temp_output.wav
+temp_output.pcmu
+node_modules/
+dist/
+.angular/

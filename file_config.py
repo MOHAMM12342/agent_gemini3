@@ -6,7 +6,9 @@ import os
 
 # --- 1. CONFIGURATION ---
 # Use one client for both operations (Chat & TTS)
-API_KEY = "AIzaSyAMnkOwArOdiRZKSn78g_XO56eLBzHi2k8"  
+API_KEY = os.getenv("GEMINI_API_KEY", "")
+if not API_KEY:
+    print("WARNING: GEMINI_API_KEY environment variable is not set!")
 client = genai.Client(api_key=API_KEY)
 
 # --- 2. DEFINE TOOLS (SSH) ---
