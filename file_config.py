@@ -6,7 +6,7 @@ import os
 
 # --- 1. CONFIGURATION ---
 # Use one client for both operations (Chat & TTS)
-API_KEY = "AIzaSyAMnkOwArOdiRZKS.........."  # Ideally, use os.getenv("GEMINI_API_KEY")
+API_KEY = "AIzaSyAMnkOwArOdiRZKSn78g_XO56eLBzHi2k8"  
 client = genai.Client(api_key=API_KEY)
 
 # --- 2. DEFINE TOOLS (SSH) ---
@@ -20,8 +20,9 @@ def ssh_execute(command: str) -> str:
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        # Note: Ensure your Docker container is running and mapped to port 2222
-        ssh.connect('192.168.1.6', port=2222, username='moham', password='password')
+        ssh_host = os.getenv("SSH_HOST", "127.0.0.1")
+        ssh_port = int(os.getenv("SSH_PORT", 2222))
+        ssh.connect(ssh_host, port=ssh_port, username='moham', password='password')
         stdin, stdout, stderr = ssh.exec_command(command)
         output = stdout.read().decode("utf-8")
         error = stderr.read().decode("utf-8")
@@ -35,7 +36,7 @@ tools_list = [ssh_execute]
 
 # Initialize the chat session with the tool config
 chat = client.chats.create(
-    model="gemini-3-flash-preview",
+    model="gemini-2.5-flash",
     config=types.GenerateContentConfig(
         tools=tools_list,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(
@@ -54,7 +55,7 @@ def generate_3cx_audio(text_prompt: str):
 
     # CORRECTED: Send text directly to contents, do NOT wrap in Part.from_bytes
     response = client.models.generate_content(
-        model="gemini-3-flash-preview",
+        model="gemini-2.5-flash",
         contents=text_prompt,  # Direct text input
         config=types.GenerateContentConfig(
             response_modalities=["AUDIO"], # Explicitly ask for audio

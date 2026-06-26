@@ -32,7 +32,7 @@ export class AppComponent implements OnDestroy {
 
   // Signals
   isMonitoring = signal(false);
-  backendPort = signal(2223);
+  backendPort = signal(8000);
   logs = signal<LogEntry[]>([]);
   stream = signal<MediaStream | null>(null);
   lastAnalysis = signal<string>("System Idle. Waiting to start.");
@@ -49,6 +49,7 @@ export class AppComponent implements OnDestroy {
   // Private state
   private intervalId: any;
   private readonly REFRESH_RATE_MS = 3000; // Analyze every 3 seconds
+  private ws: WebSocket | null = null;
 
   async toggleMonitoring() {
     if (this.isMonitoring()) {
@@ -70,7 +71,8 @@ export class AppComponent implements OnDestroy {
       this.isMonitoring.set(true);
       this.addLog('info', 'Camera and Audio connected. Sentinel System Active.');
       this.addLog('info', `Connected to Backend on Port ${this.backendPort()}`);
-
+      
+      this.setupWebSocket();
       
     } catch (err) {
       this.addLog('error', 'Failed to access camera/microphone: ' + err);
@@ -91,52 +93,63 @@ export class AppComponent implements OnDestroy {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
     this.addLog('info', 'Monitoring stopped.');
     this.lastAnalysis.set("System Idle.");
   }
 
- async analyzeTick() {
-  if (!this.isMonitoring() || this.isAnalyzing() || this.pendingAction()) return;
-  if(!localStorage.getItem("videoBase64") && isPlatformBrowser(this.platformId)) {
-        this.isAnalyzing.set(true);
-  
-  try {
-    // AJOUT DE AWAIT ICI
-    const videoBase64 = await this.captureFrame(); 
-
-    
-    if (!videoBase64) {
-      this.isAnalyzing.set(false);
-      return;
+  private setupWebSocket() {
+    if (this.ws) {
+      this.ws.close();
     }
-    localStorage.setItem("videoBase64", videoBase64);
-  }
- catch (err) {
-    this.addLog('error', 'Analysis cycle failed: ' + err);
-  } finally {
-    this.isAnalyzing.set(false);
-  }
-}
-else 
-{
-  if(isPlatformBrowser(this.platformId)){
-
     try {
-
-    if(isPlatformBrowser(this.platformId)) {
-      const videoBase64 = localStorage.getItem("videoBase64") || "";
-      this.response = this.backendService.analyzeFrame(this.backendPort(), videoBase64 , this.prompt);
-      console.log('Backend Response:', this.response);
+      this.ws = new WebSocket(`ws://localhost:${this.backendPort()}/ws/logs`);
+      this.ws.onmessage = (event) => {
+        this.addLog('action', `[SYS] ${event.data}`);
+      };
+      this.ws.onopen = () => {
+        this.addLog('success', 'Connected to Live Diagnostic Terminal.');
+      };
+      this.ws.onerror = (err) => {
+        console.error('WebSocket Error:', err);
+      };
+      this.ws.onclose = () => {
+        this.addLog('warning', 'Live Diagnostics connection closed.');
+      };
+    } catch (e) {
+      this.addLog('error', 'Failed to initialize Live Diagnostics WS.');
     }
-
-  }
-  catch (err) {
-    this.addLog('error', 'Failed to analyze frame: ' + err);
   }
 
+  async analyzeTick() {
+    if (this.isAnalyzing() || this.pendingAction()) return;
+    
+    this.isAnalyzing.set(true);
+    try {
+      let videoBase64 = "";
+      
+      // Only capture a frame if camera is connected
+      if (this.isMonitoring() && isPlatformBrowser(this.platformId)) {
+        const captured = await this.captureFrame();
+        if (captured) {
+          videoBase64 = captured;
+        }
+      }
+      
+      // Send to backend (with or without video)
+      this.response = this.backendService.analyzeFrame(this.backendPort(), videoBase64, this.prompt);
+      
+      const result = await this.response;
+      console.log('Backend Response:', result);
+    } catch (err) {
+      this.addLog('error', 'Analysis cycle failed: ' + err);
+    } finally {
+      this.isAnalyzing.set(false);
+    }
   }
-}
-}
 
 //  private handleBackendResponse(response: AnalysisResponse) {
  //   if (response.type === 'action_request' && response.requestId && response.action) {

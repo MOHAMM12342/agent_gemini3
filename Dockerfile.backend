@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000 5060/udp
+
+COPY start_backend.sh /start_backend.sh
+RUN chmod +x /start_backend.sh
+
+CMD ["/start_backend.sh"]

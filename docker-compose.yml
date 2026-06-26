@@ -1,0 +1,36 @@
+services:
+  ssh_target:
+    build:
+      context: .
+      dockerfile: Dockerfile.ssh
+    ports:
+      - "2222:22"
+    container_name: ai_ssh_target
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+      - "5060:5060/udp"
+    environment:
+      - SSH_HOST=ssh_target
+      - SSH_PORT=22
+      - SIP_BIND_IP=0.0.0.0
+    depends_on:
+      - ssh_target
+    container_name: ai_backend
+    restart: always
+
+  frontend:
+    build:
+      context: ./Front_end/front-end
+      dockerfile: Dockerfile
+    ports:
+      - "4200:4200"
+    depends_on:
+      - backend
+    container_name: ai_frontend
+    restart: always
